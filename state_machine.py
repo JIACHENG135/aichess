@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import stat
 
 
 def is_legal_by_bound(state, x, y):
@@ -106,7 +107,13 @@ class BlackGeneral(Piece):
     name = "黑帅"
 
     @staticmethod
-    @filter_legal_moves("黑")
+    def _filter(cur_state, x, y, new_x, new_y):
+        if new_x < 7 or new_y < 3 or new_y > 5:
+            return False
+        return True
+
+    @staticmethod
+    @filter_legal_moves("黑", customize_filter=_filter)
     def get_next_legal_move(cur_state, x, y):
         return [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
 
@@ -115,7 +122,13 @@ class RedGeneral(Piece):
     name = "红帅"
 
     @staticmethod
-    @filter_legal_moves("红")
+    def _filter(cur_state, x, y, new_x, new_y):
+        if new_x > 2 or new_y < 3 or new_y > 5:
+            return False
+        return True
+
+    @staticmethod
+    @filter_legal_moves("红", customize_filter=_filter)
     def get_next_legal_move(cur_state, x, y):
         return [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
 
@@ -170,6 +183,10 @@ if __name__ == "__main__":
             pieces = Piece.get_all_available_pieces()
             self.assertIn(BlackMinion, pieces)
             self.assertIn(RedMinion, pieces)
+            self.assertIn(BlackGeneral, pieces)
+            self.assertIn(RedGeneral, pieces)
+            self.assertIn(BlackCannon, pieces)
+            self.assertIn(RedCannon, pieces)
 
         def test_get_name_to_cls_mapping(self):
             mapping = Piece.get_name_to_cls_mapping()
