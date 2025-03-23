@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import cache
 import stat
 
 
@@ -181,6 +182,15 @@ class StateMachine:
                                         if (x, y, move[0], move[1]) not in yielded:
                                             yielded.add((x, y, move[0], move[1]))
                                             yield (x, y), move
+
+    @staticmethod
+    def get_a_random_mutate(state, player):
+        from random import choice
+
+        moves = list(StateMachine.get_all_legal_mutates(state, player))
+        if moves:
+            return choice(moves)
+        return None
 
     @staticmethod
     def make_move(state, from_pos, to_pos):
