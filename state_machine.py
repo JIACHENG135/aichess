@@ -167,7 +167,29 @@ class RedCannon(Cannon):
 class StateMachine:
     @staticmethod
     def get_all_legal_mutates(state, player):
-        return []
+        yielded = set()
+        for _row in state:
+            for _piece in _row:
+                if _piece != "一一":
+                    piece_cls = Piece.get_name_to_cls_mapping().get(_piece)
+                    if piece_cls and _piece.startswith(player):
+                        for x in range(len(state)):
+                            for y in range(len(state[0])):
+                                if piece_cls._is(state, x, y):
+                                    moves = piece_cls.get_next_legal_move(state, x, y)
+                                    for move in moves:
+                                        if (x, y, move[0], move[1]) not in yielded:
+                                            yielded.add((x, y, move[0], move[1]))
+                                            yield (x, y), move
+
+    @staticmethod
+    def make_move(state, from_pos, to_pos):
+        x_from, y_from = from_pos
+        x_to, y_to = to_pos
+        new_state = [row[:] for row in state]
+        new_state[x_to][y_to] = new_state[x_from][y_from]
+        new_state[x_from][y_from] = "一一"
+        return new_state
 
 
 if __name__ == "__main__":
@@ -213,5 +235,15 @@ if __name__ == "__main__":
             actual_moves = BlackCannon.get_next_legal_move(state, 2, 0)
             expect_moves = {(0, 0), (1, 0), (3, 0), (4, 0), (2, 3)}
             self.assertEqual(actual_moves, expect_moves)
+
+        def test_state_machine(self):
+            state = [
+                ["一一", "一一", "一一"],
+                ["一一", "黑炮", "一一"],
+                ["一一", "红车", "一一"],
+            ]
+            player = "黑"
+            moves = list(StateMachine.get_all_legal_mutates(state, player))
+            self.assertEqual(len(moves), 3)
 
     unittest.main()
