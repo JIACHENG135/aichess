@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from calendar import c
 from functools import cache
 import stat
 
@@ -16,21 +17,52 @@ def is_legal_by_state(state, color, x, y):
     return True
 
 
-def cannon_filter(cur_state, x, y, new_x, new_y):
-    not_occupied = cur_state[new_x][new_y] == "一一"
+def raw_moves(cur_state, x, y):
+    moves = []
+    for i in range(1, 10):
+        moves.append((x + i, y))
+        moves.append((x - i, y))
+        moves.append((x, y + i))
+        moves.append((x, y - i))
+    return moves
+
+
+def linear_move_filter(cur_state, x, y, new_x, new_y, *, allow_jump=False):
+
+    src_piece = cur_state[x][y]
+    dst_piece = cur_state[new_x][new_y]
+
+    if x != new_x and y != new_y:
+        return False
+
     count = 0
-    move_direction = (new_x - x, new_y - y)
-    if move_direction[0] != 0:
-        step = 1 if move_direction[0] > 0 else -1
+    if x != new_x:
+        step = 1 if new_x > x else -1
         for i in range(x + step, new_x, step):
             if cur_state[i][y] != "一一":
                 count += 1
-    if move_direction[1] != 0:
-        step = 1 if move_direction[1] > 0 else -1
+    elif y != new_y:
+        step = 1 if new_y > y else -1
         for i in range(y + step, new_y, step):
             if cur_state[x][i] != "一一":
                 count += 1
-    return (count == 1 and not not_occupied) or (count == 0 and not_occupied)
+
+    dst_empty = dst_piece == "一一"
+    dst_enemy = dst_piece != "一一" and not dst_piece.startswith(src_piece[0])
+
+    if allow_jump:
+        return (count == 1 and dst_enemy) or (count == 0 and dst_empty)
+    else:
+        return count == 0 and (dst_empty or dst_enemy)
+
+
+car_filter = lambda cur_state, x, y, new_x, new_y: linear_move_filter(
+    cur_state, x, y, new_x, new_y, allow_jump=False
+)
+
+cannon_filter = lambda cur_state, x, y, new_x, new_y: linear_move_filter(
+    cur_state, x, y, new_x, new_y, allow_jump=True
+)
 
 
 def filter_legal_moves(color, customize_filter=None):
@@ -137,24 +169,12 @@ class RedGeneral(Piece):
 class Cannon(Piece):
     name = None
 
-    @classmethod
-    def raw_moves(cls, cur_state, x, y):
-        moves = []
-        for i in range(1, 10):
-            moves.append((x + i, y))
-            moves.append((x - i, y))
-            moves.append((x, y + i))
-            moves.append((x, y - i))
-        return moves
-
     get_next_legal_move = classmethod(lambda cls, cur_state, x, y: [])
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         color = cls.name[0]
-        cls.get_next_legal_move = filter_legal_moves(color, cannon_filter)(
-            cls.raw_moves
-        )
+        cls.get_next_legal_move = filter_legal_moves(color, cannon_filter)(raw_moves)
 
 
 class BlackCannon(Cannon):
@@ -163,6 +183,153 @@ class BlackCannon(Cannon):
 
 class RedCannon(Cannon):
     name = "红炮"
+
+
+class Car(Piece):
+    name = None
+
+    get_next_legal_move = classmethod(lambda cls, cur_state, x, y: [])
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        color = cls.name[0]
+        cls.get_next_legal_move = filter_legal_moves(color, car_filter)(raw_moves)
+
+
+class BlackCar(Car):
+    name = "黑车"
+
+
+class RedCar(Car):
+    name = "红车"
+
+
+def horse_move(cur_state, x, y):
+    moves = []
+    for dx, dy in [
+        (2, 1),
+        (2, -1),
+        (-2, 1),
+        (-2, -1),
+        (1, 2),
+        (1, -2),
+        (-1, 2),
+        (-1, -2),
+    ]:
+        new_x = x + dx
+        new_y = y + dy
+        if is_legal_by_bound(cur_state, new_x, new_y):
+            if cur_state[new_x][new_y] == "一一" or not cur_state[new_x][
+                new_y
+            ].startswith(cur_state[x][y][0]):
+                if (
+                    (dx == 2 and cur_state[x + 1][y] == "一一")
+                    or (dx == -2 and cur_state[x - 1][y] == "一一")
+                    or (dy == 2 and cur_state[x][y + 1] == "一一")
+                    or (dy == -2 and cur_state[x][y - 1] == "一一")
+                ):
+                    moves.append((new_x, new_y))
+
+    return moves
+
+
+class Horse(Piece):
+    name = None
+
+    get_next_legal_move = classmethod(lambda cls, cur_state, x, y: [])
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        color = cls.name[0]
+        cls.get_next_legal_move = filter_legal_moves(color)(horse_move)
+
+
+class BlackHorse(Horse):
+    name = "黑马"
+
+
+class RedHorse(Horse):
+    name = "红马"
+
+
+def elephant_move(cur_state, x, y):
+    moves = []
+    black_bound = 5
+    red_bound = 4
+    for dx, dy in [(2, 2), (2, -2), (-2, 2), (-2, -2)]:
+        new_x = x + dx
+        new_y = y + dy
+        if is_legal_by_bound(cur_state, new_x, new_y):
+            if cur_state[new_x][new_y] == "一一" or not cur_state[new_x][
+                new_y
+            ].startswith(cur_state[x][y][0]):
+                midx = (x + new_x) // 2
+                midy = (y + new_y) // 2
+                if cur_state[midx][midy] == "一一":
+                    if (cur_state[x][y].startswith("黑") and midx >= black_bound) or (
+                        cur_state[x][y].startswith("红") and midx <= red_bound
+                    ):
+                        moves.append((new_x, new_y))
+    return moves
+
+
+class Elephant(Piece):
+    name = None
+
+    get_next_legal_move = classmethod(lambda cls, cur_state, x, y: [])
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        color = cls.name[0]
+        cls.get_next_legal_move = filter_legal_moves(color)(elephant_move)
+
+
+class BlackElephant(Elephant):
+    name = "黑象"
+
+
+class RedElephant(Elephant):
+    name = "红象"
+
+
+def gurdian_move(cur_state, x, y):
+    moves = []
+    for dx, dy in [(1, 1), (1, -1), (-1, 1), (-1, -1)]:
+        new_x = x + dx
+        new_y = y + dy
+        if is_legal_by_bound(cur_state, new_x, new_y):
+            if (
+                (
+                    cur_state[new_x][new_y] == "一一"
+                    or not cur_state[new_x][new_y].startswith(cur_state[x][y][0])
+                )
+                and new_y >= 3
+                and new_y <= 5
+            ):
+                if (cur_state[x][y].startswith("黑") and new_x >= 7) or (
+                    cur_state[x][y].startswith("红") and new_x <= 2
+                ):
+                    moves.append((new_x, new_y))
+    return moves
+
+
+class Gurdian(Piece):
+    name = None
+
+    get_next_legal_move = classmethod(lambda cls, cur_state, x, y: [])
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        color = cls.name[0]
+        cls.get_next_legal_move = filter_legal_moves(color)(gurdian_move)
+
+
+class BlackGurdian(Gurdian):
+    name = "黑士"
+
+
+class RedGurdian(Gurdian):
+    name = "红士"
 
 
 class StateMachine:
@@ -255,5 +422,163 @@ if __name__ == "__main__":
             player = "黑"
             moves = list(StateMachine.get_all_legal_mutates(state, player))
             self.assertEqual(len(moves), 3)
+
+        def test_car_filter(self):
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["黑车", "一一", "红车", "红车"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["黑炮", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackCar.get_next_legal_move(state, 1, 0)
+            expect_moves = {(0, 0), (1, 1), (1, 2), (2, 0), (3, 0)}
+            self.assertEqual(actual_moves, expect_moves)
+
+        def test_horse_move(self):
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["红车", "一一", "一一", "一一"],
+                ["黑马", "一一", "红车", "红车"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["黑炮", "一一", "一一", "黑车"],
+                ["一一", "黑车", "红车", "红车"],
+            ]
+            actual_moves = BlackHorse.get_next_legal_move(state, 2, 0)
+            expect_moves = {(3, 2), (1, 2), (4, 1)}
+            self.assertEqual(actual_moves, expect_moves)
+
+        def test_elephant_move(self):
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["黑象", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 9, 0)
+            expect_moves = {(7, 2)}
+            self.assertEqual(actual_moves, expect_moves)
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "黑象", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 7, 2)
+            expect_moves = {(9, 0), (5, 0)}
+            self.assertEqual(actual_moves, expect_moves)
+
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "黑象", "一一"],
+                ["一一", "红兵", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 7, 2)
+            expect_moves = {(5, 0)}
+            self.assertEqual(actual_moves, expect_moves)
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "黑象", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["红兵", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 7, 2)
+            expect_moves = {(5, 0), (9, 0)}
+            self.assertEqual(actual_moves, expect_moves)
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "黑象", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["黑车", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 7, 2)
+            expect_moves = {(5, 0)}
+            self.assertEqual(actual_moves, expect_moves)
+            state = [
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["黑象", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一"],
+            ]
+            actual_moves = BlackElephant.get_next_legal_move(state, 5, 0)
+            expect_moves = {(7, 2)}
+            self.assertEqual(actual_moves, expect_moves)
+
+        def test_gurdian_move(self):
+            # fmt: off
+            state = [
+                ["红车", "红马", "红象", "红士", "红帅", "红士", "红象", "红马", "红车"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["一一", "红炮", "一一", "一一", "一一", "一一", "一一", "红炮", "一一"],
+                ["红兵", "一一", "红兵", "一一", "红兵", "一一", "红兵", "一一", "红兵"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["黑兵", "一一", "黑兵", "一一", "黑兵", "一一", "黑兵", "一一", "黑兵"],
+                ["一一", "黑炮", "一一", "一一", "一一", "一一", "一一", "黑炮", "一一"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["黑车", "黑马", "黑象", "黑士", "黑帅", "黑士", "黑象", "黑马", "黑车"],
+            ]
+            # fmt: on
+            actual_moves = BlackGurdian.get_next_legal_move(state, 0, 3)
+            expect_moves = {(1, 4)}
+            self.assertEqual(actual_moves, expect_moves)
+            # fmt: off
+            state = [
+                ["红车", "红马", "红象", "红士", "红帅", "一一", "红象", "红马", "红车"],
+                ["一一", "一一", "一一", "一一", "红士", "一一", "一一", "一一", "一一"],
+                ["一一", "红炮", "一一", "一一", "一一", "一一", "一一", "红炮", "一一"],
+                ["红兵", "一一", "红兵", "一一", "红兵", "一一", "红兵", "一一", "红兵"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一", "一一"],
+                ["黑兵", "一一", "黑兵", "一一", "黑兵", "一一", "黑兵", "一一", "黑兵"],
+                ["一一", "黑炮", "一一", "一一", "一一", "一一", "一一", "黑炮", "一一"],
+                ["一一", "一一", "一一", "一一", "黑士", "一一", "一一", "一一", "一一"],
+                ["黑车", "黑马", "黑象", "黑士", "黑帅", "一一", "黑象", "黑马", "黑车"],
+            ]
+            # fmt: on
+            actual_moves = BlackGurdian.get_next_legal_move(state, 1, 4)
+            expect_moves = {(0, 5), (2, 3), (2, 5)}
+            actual_moves = BlackGurdian.get_next_legal_move(state, 8, 4)
+            expect_moves = {(7, 3), (7, 5), (9, 5)}
+            self.assertEqual(actual_moves, expect_moves)
 
     unittest.main()
