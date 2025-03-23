@@ -862,34 +862,34 @@ if __name__ == '__main__':
     print(move_actions)"""
 
     # 测试Board中的start_play
-    # class Human1:
-    #     def get_action(self, board):
-    #         # print('当前是player1在操作')
-    #         # print(board.current_player_color)
-    #         # move = move_action2move_id[input('请输入')]
-    #         move = random.choice(board.availables)
-    #         return move
-    #
-    #     def set_player_ind(self, p):
-    #         self.player = p
-    #
-    #
-    # class Human2:
-    #     def get_action(self, board):
-    #         # print('当前是player2在操作')
-    #         # print(board.current_player_color)
-    #         # move = move_action2move_id[input('请输入')]
-    #         move = random.choice(board.availables)
-    #         return move
-    #
-    #     def set_player_ind(self, p):
-    #         self.player = p
-    #
-    # human1 = Human1()
-    # human2 = Human2()
-    # game = Game(board=Board())
-    # for i in range(20):
-    #     game.start_play(human1, human2, start_player=2, is_shown=0)
+    class Human1:
+        def get_action(self, board):
+            # print('当前是player1在操作')
+            # print(board.current_player_color)
+            # move = move_action2move_id[input('请输入')]
+            move = random.choice(board.availables)
+            return move
+    
+        def set_player_ind(self, p):
+            self.player = p
+    
+    
+    class Human2:
+        def get_action(self, board):
+            # print('当前是player2在操作')
+            # print(board.current_player_color)
+            # move = move_action2move_id[input('请输入')]
+            move = random.choice(board.availables)
+            return move
+    
+        def set_player_ind(self, p):
+            self.player = p
+    
+    human1 = Human1()
+    human2 = Human2()
+    game = Game(board=Board())
+    for i in range(20):
+        game.start_play(human1, human2, start_player=2, is_shown=1)
     board = Board()
     board.init_board()
 
